@@ -17,7 +17,7 @@ const Navbar = () => {
         <div className="hidden md:flex items-center gap-8">
           <a href="/#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Features</a>
           <a href="/#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">How It Works</a>
-          <a href="/route-map" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Route Map</a>
+          <a href="/route-map" className="text-sm font-medium text-primary hover:text-primary/80 transition-colors font-semibold border border-primary/30 px-3 py-1 rounded-full">Route Map</a>
           <a href="/aqi" className="text-sm font-medium text-primary hover:text-primary/80 transition-colors font-semibold border border-primary/30 px-3 py-1 rounded-full">AQI Monitor</a>
           <Button variant="hero" size="sm">Get Started</Button>
         </div>
