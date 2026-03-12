@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { MapContainer, TileLayer, Polyline, Popup } from "react-leaflet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MapPin, Navigation, Car, Truck, Bike, ArrowRight, Leaf, Clock, Route } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { sampleRoutes, getAqiLevel } from "@/data/mockAqiData";
+import { searchLocations, type LocationSuggestion } from "@/data/locationSuggestions";
 import Navbar from "@/components/Navbar";
 import "leaflet/dist/leaflet.css";
 
@@ -13,6 +14,85 @@ const modes = [
   { icon: Truck, label: "Delivery" },
   { icon: Bike, label: "Cycling" },
 ];
+
+const typeIcons: Record<string, string> = {
+  city: "🏙️",
+  area: "📍",
+  state: "🗺️",
+};
+
+interface LocationInputProps {
+  icon: React.ElementType;
+  placeholder: string;
+  value: string;
+  onChange: (val: string) => void;
+}
+
+const LocationInput = ({ icon: Icon, placeholder, value, onChange }: LocationInputProps) => {
+  const [focused, setFocused] = useState(false);
+  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setSuggestions(searchLocations(value));
+  }, [value]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const showDropdown = focused && suggestions.length > 0;
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <Icon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary z-10" />
+      <Input
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        className="pl-10 h-12 bg-card border-border"
+      />
+      <AnimatePresence>
+        {showDropdown && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-lg z-50 overflow-hidden"
+          >
+            {suggestions.map((s) => (
+              <button
+                key={s.id}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onChange(s.name);
+                  setFocused(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-primary/5 transition-colors border-b border-border/50 last:border-b-0"
+              >
+                <span className="text-base">{typeIcons[s.type]}</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{s.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {s.parent} · <span className="capitalize">{s.type}</span>
+                  </p>
+                </div>
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 const RouteMap = () => {
   const [activeMode, setActiveMode] = useState(0);
@@ -61,26 +141,20 @@ const RouteMap = () => {
               ))}
             </div>
 
-            {/* Inputs */}
+            {/* Inputs with autocomplete */}
             <div className="space-y-3">
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
-                <Input
-                  placeholder="Starting point"
-                  value={from}
-                  onChange={(e) => setFrom(e.target.value)}
-                  className="pl-10 h-12 bg-card border-border"
-                />
-              </div>
-              <div className="relative">
-                <Navigation className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
-                <Input
-                  placeholder="Destination"
-                  value={to}
-                  onChange={(e) => setTo(e.target.value)}
-                  className="pl-10 h-12 bg-card border-border"
-                />
-              </div>
+              <LocationInput
+                icon={MapPin}
+                placeholder="Starting point — city, area, or state"
+                value={from}
+                onChange={setFrom}
+              />
+              <LocationInput
+                icon={Navigation}
+                placeholder="Destination — city, area, or state"
+                value={to}
+                onChange={setTo}
+              />
               <Button variant="hero" className="w-full h-12 gap-2" onClick={handleSearch}>
                 Find Clean Route <ArrowRight className="h-4 w-4" />
               </Button>
