@@ -18,10 +18,10 @@ const Navbar = () => {
           <a href="/#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Features</a>
           <a href="/#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">How It Works</a>
           <a href="/#routes" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Routes</a>
-          <a href="/route-map" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+          <a href="/route-map" className="inline-flex items-center gap-1.5 px-2 py-2 rounded-md bg-primary text-primary-foreground text-sm font-semibold shadow-md hover:bg-primary/90 transition-all">
             <Route className="h-4 w-4" /> Route Map
           </a>
-          <a href="/aqi" className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold shadow-md hover:bg-primary/90 transition-all">
+          <a href="/aqi" className="inline-flex items-center gap-1.5 px-2 py-2 rounded-md bg-primary text-primary-foreground text-sm font-semibold shadow-md hover:bg-primary/90 transition-all">
             <Activity className="h-4 w-4" /> AQI Monitor
           </a>
           <Button variant="hero" size="sm" className="rounded-full px-5">Get Started</Button>
