@@ -17,9 +17,14 @@ const Navbar = () => {
         <div className="hidden md:flex items-center gap-8">
           <a href="/#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Features</a>
           <a href="/#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">How It Works</a>
-          <a href="/route-map" className="text-sm font-medium text-primary hover:text-primary/80 transition-colors font-semibold border border-primary/30 px-3 py-1 rounded-full">Route Map</a>
-          <a href="/aqi" className="text-sm font-medium text-primary hover:text-primary/80 transition-colors font-semibold border border-primary/30 px-3 py-1 rounded-full">AQI Monitor</a>
-          <Button variant="hero" size="sm">Get Started</Button>
+          <a href="/#routes" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Routes</a>
+          <a href="/route-map" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+            <Route className="h-4 w-4" /> Route Map
+          </a>
+          <a href="/aqi" className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold shadow-md hover:bg-primary/90 transition-all">
+            <Activity className="h-4 w-4" /> AQI Monitor
+          </a>
+          <Button variant="hero" size="sm" className="rounded-full px-5">Get Started</Button>
         </div>
 
         <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen(!open)}>
