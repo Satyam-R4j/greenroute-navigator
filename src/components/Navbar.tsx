@@ -43,9 +43,14 @@ const Navbar = () => {
             <div className="flex flex-col gap-3 p-4">
               <a href="/#features" className="text-sm font-medium text-muted-foreground" onClick={() => setOpen(false)}>Features</a>
               <a href="/#how-it-works" className="text-sm font-medium text-muted-foreground" onClick={() => setOpen(false)}>How It Works</a>
-              <a href="/route-map" className="text-sm font-medium text-primary font-semibold" onClick={() => setOpen(false)}>Route Map</a>
-              <a href="/aqi" className="text-sm font-medium text-primary font-semibold" onClick={() => setOpen(false)}>AQI Monitor</a>
-              <Button variant="hero" size="sm">Get Started</Button>
+              <a href="/#routes" className="text-sm font-medium text-muted-foreground" onClick={() => setOpen(false)}>Routes</a>
+              <a href="/route-map" className="text-sm font-medium text-muted-foreground flex items-center gap-1.5" onClick={() => setOpen(false)}>
+                <Route className="h-4 w-4" /> Route Map
+              </a>
+              <a href="/aqi" className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold w-fit" onClick={() => setOpen(false)}>
+                <Activity className="h-4 w-4" /> AQI Monitor
+              </a>
+              <Button variant="hero" size="sm" className="rounded-full">Get Started</Button>
             </div>
           </motion.div>
         )}
