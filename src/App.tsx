@@ -7,23 +7,36 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AqiDashboard from "./pages/AqiDashboard";
 import RouteMap from "./pages/RouteMap";
+import Login from "./pages/Login";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/aqi" element={<AqiDashboard />} />
-          <Route path="/route-map" element={<RouteMap />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/aqi" element={<AqiDashboard />} />
+            <Route 
+              path="/route-map" 
+              element={
+                <ProtectedRoute>
+                  <RouteMap />
+                </ProtectedRoute>
+              } 
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

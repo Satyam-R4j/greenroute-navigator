@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { MapPin, Navigation, Truck, Bike, Car, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import heroBg from "@/assets/hero-bg.jpg";
+import { useNavigate } from "react-router-dom";
 
 const modes = [
   { icon: Car, label: "Travel", active: true },
@@ -13,6 +14,14 @@ const modes = [
 
 const HeroSection = () => {
   const [activeMode, setActiveMode] = useState(0);
+  const [startPoint, setStartPoint] = useState("");
+  const [destination, setDestination] = useState("");
+  const navigate = useNavigate();
+
+  const handleSearch = () => {
+    // Navigate to route map. Unauthenticated users will be intercepted by ProtectedRoute
+    navigate("/route-map");
+  };
 
   return (
     <section className="relative min-h-screen flex items-center pt-16 overflow-hidden">
@@ -81,6 +90,8 @@ const HeroSection = () => {
                 <Input
                   placeholder="Starting point"
                   className="pl-10 h-12 bg-muted border-none"
+                  value={startPoint}
+                  onChange={(e) => setStartPoint(e.target.value)}
                 />
               </div>
               <div className="relative">
@@ -88,11 +99,17 @@ const HeroSection = () => {
                 <Input
                   placeholder="Destination"
                   className="pl-10 h-12 bg-muted border-none"
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
                 />
               </div>
             </div>
 
-            <Button variant="hero" className="w-full h-12 text-base gap-2">
+            <Button 
+              variant="hero" 
+              className="w-full h-12 text-base gap-2"
+              onClick={handleSearch}
+            >
               Find Clean Route
               <ArrowRight className="h-4 w-4" />
             </Button>
