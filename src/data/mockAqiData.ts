@@ -16,6 +16,14 @@ export interface CityAqi {
   updatedAt: string;
 }
 
+export interface RouteSegment {
+  lat: number;
+  lng: number;
+  aqi: number;
+  distanceMeters: number;
+  advice: string;
+}
+
 export interface RouteOption {
   id: string;
   name: string;
@@ -24,6 +32,11 @@ export interface RouteOption {
   avgAqi: number;
   path: [number, number][];
   color: string;
+  transportMode?: 'driving' | 'ev' | 'cycling' | 'walking';
+  segments?: RouteSegment[];
+  co2SavedKg?: number;
+  caloriesBurned?: number;
+  pm25AvoidedUg?: number;
 }
 
 export const cities: CityAqi[] = [

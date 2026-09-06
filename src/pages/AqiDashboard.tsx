@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import { Input } from "@/components/ui/input";
-import { Search, MapPin, Clock, ArrowRight, Loader2, Info, Map as MapIcon } from "lucide-react";
+import { Search, MapPin, Clock, ArrowRight, Loader2, Info, Navigation, Wind, Activity, Flame, ShieldAlert, Sparkles, Map as MapIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import { toast } from "sonner";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getStationsInBounds, searchLocation, getAqiColor, type WaqiStation } from "@/services/waqiService";
+import { AqiForecastChart } from "@/components/AqiForecastChart";
+import { AqiLegendOverlay } from "@/components/AqiLegendOverlay";
 
 // Helper component to auto-fit map to a specific location
 const MapController = ({ targetLocation }: { targetLocation: [number, number] | null }) => {
@@ -42,7 +44,6 @@ const MapDataFetcher = ({ setStations, setIsLoading }: { setStations: (s: WaqiSt
     zoomend: fetchStations
   });
 
-  // Initial fetch on mount
   useEffect(() => {
     fetchStations();
   }, [fetchStations]);
@@ -50,22 +51,30 @@ const MapDataFetcher = ({ setStations, setIsLoading }: { setStations: (s: WaqiSt
   return null;
 };
 
+// Global megacity quick presets
+const MEGACITIES = [
+  { name: "New York", lat: 40.7128, lon: -74.0060 },
+  { name: "London", lat: 51.5074, lon: -0.1278 },
+  { name: "Delhi", lat: 28.6139, lon: 77.2090 },
+  { name: "Tokyo", lat: 35.6762, lon: 139.6503 },
+  { name: "Beijing", lat: 39.9042, lon: 116.4074 },
+  { name: "Paris", lat: 48.8566, lon: 2.3522 },
+];
+
 const AqiDashboard = () => {
   const [search, setSearch] = useState("");
   const [stations, setStations] = useState<WaqiStation[]>([]);
   const [selectedStation, setSelectedStation] = useState<WaqiStation | null>(null);
-  // Default to a central global view
   const [targetLocation, setTargetLocation] = useState<[number, number] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   
-  // Suggestion State
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Handle clicking outside to close suggestions
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -87,7 +96,7 @@ const AqiDashboard = () => {
         const results = await searchLocation(value);
         setSuggestions(results);
         setIsDropdownOpen(true);
-      }, 300); // 300ms debounce
+      }, 300);
     } else {
       setSuggestions([]);
       setIsDropdownOpen(false);
@@ -106,7 +115,6 @@ const AqiDashboard = () => {
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    
     const query = search.trim();
     if (!query) return;
 
@@ -115,11 +123,9 @@ const AqiDashboard = () => {
     setIsSearching(false);
 
     if (results && results.length > 0) {
-      // Find the first result that has valid geo coordinates
       const bestMatch = results[0];
       if (bestMatch && bestMatch.latitude && bestMatch.longitude) {
          setTargetLocation([bestMatch.latitude, bestMatch.longitude]);
-         // Deselect current station so the user focuses on the new area
          setSelectedStation(null);
       } else {
          toast.error("Location found but no map coordinates available.");
@@ -127,6 +133,56 @@ const AqiDashboard = () => {
     } else {
       toast.error(`No AQI data found for "${query}"`);
     }
+  };
+
+  const handleLocateMe = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser.");
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsLocating(false);
+        setTargetLocation([pos.coords.latitude, pos.coords.longitude]);
+        setSelectedStation(null);
+        toast.success("Located your current area!");
+      },
+      (err) => {
+        setIsLocating(false);
+        toast.error("Could not fetch your location. Please check browser permissions.");
+      }
+    );
+  };
+
+  const getActivityGuidance = (aqiStr: string) => {
+    const aqi = parseInt(aqiStr, 10);
+    if (aqi <= 50) {
+      return {
+        exercise: "✅ Ideal for outdoor running & exercise",
+        windows: "🪟 Safe to open windows for ventilation",
+        purifier: "🍃 Air purifier optional"
+      };
+    }
+    if (aqi <= 100) {
+      return {
+        exercise: "🙂 Moderate - Outdoor workouts suitable for most",
+        windows: "🪟 Normal window ventilation ok",
+        purifier: "🍃 Low fan speed air purification"
+      };
+    }
+    if (aqi <= 150) {
+      return {
+        exercise: "⚠️ Limit prolonged intense outdoor runs",
+        windows: "🔒 Close windows during peak traffic hours",
+        purifier: "🌬️ Run air purifier in main rooms"
+      };
+    }
+    return {
+      exercise: "🚫 Avoid outdoor workouts - Stay indoors",
+      windows: "🔒 Keep all windows tightly closed",
+      purifier: "⚡ Max HEPA air purification required"
+    };
   };
 
   return (
@@ -137,16 +193,15 @@ const AqiDashboard = () => {
         {/* Full Bleed Map Container */}
         <div className="absolute inset-0 z-0">
           <MapContainer
-            center={targetLocation || [20, 0]} // Default to global view or target
+            center={targetLocation || [20, 0]}
             zoom={targetLocation ? 11 : 3}
             className="w-full h-full"
             scrollWheelZoom
             zoomControl={false}
           >
-            {/* Minimalist Silver Base Map (AirTrack Aesthetic) */}
             <TileLayer
-              attribution=''
-              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+              attribution='&copy; OpenStreetMap contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             
             <MapController targetLocation={targetLocation} />
@@ -154,8 +209,6 @@ const AqiDashboard = () => {
 
             {stations.map((station) => {
               const aqiColor = getAqiColor(station.aqi);
-              
-              // Custom div icon mimicking modern glowing UI
               const isSelected = selectedStation?.uid === station.uid;
               const iconHtml = `
                 <div class="aqi-marker-modern ${isSelected ? 'selected' : ''}" 
@@ -179,7 +232,6 @@ const AqiDashboard = () => {
                   eventHandlers={{
                     click: () => {
                       setSelectedStation(station);
-                      // Clear target so it doesn't snap back on interactions
                       setTargetLocation(null); 
                     },
                   }}
@@ -189,32 +241,40 @@ const AqiDashboard = () => {
           </MapContainer>
         </div>
 
-        {/* Floating Top Search & Header */}
+        {/* Floating Top Header & Search Bar */}
         <div className="absolute top-6 left-0 right-0 px-4 z-[410] pointer-events-none">
           <div className="container mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start gap-4">
               
               {/* Title Card */}
-              <div className="bg-card/95 backdrop-blur-xl p-5 rounded-3xl shadow-2xl border border-border/50 pointer-events-auto">
+              <div className="bg-card/95 backdrop-blur-xl p-5 rounded-3xl shadow-2xl border border-border/50 pointer-events-auto max-w-sm">
                 <motion.h1
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="text-3xl md:text-4xl font-display font-bold mb-2 text-foreground"
+                  className="text-2xl md:text-3xl font-display font-bold mb-1 text-foreground"
                 >
                   Air Quality Index
                 </motion.h1>
-                <p className="text-muted-foreground text-sm">
-                  Real-time global air quality tracking powered by WAQI
+                <p className="text-muted-foreground text-xs">
+                  Real-time global pollution tracking & forecast
                 </p>
-                <div className="mt-4 flex items-center gap-2">
-                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-secondary-foreground text-xs font-semibold shadow-sm border border-border">
-                      <span className={`w-2 h-2 rounded-full ${isLoading ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`} />
-                      {isLoading ? "Fetching stations in view..." : `Displaying ${stations.length} local stations`}
-                   </span>
+
+                {/* Megacity Presets */}
+                <div className="mt-3 flex items-center gap-1.5 overflow-x-auto pt-2 border-t border-border/40 text-[11px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <span className="font-bold text-muted-foreground shrink-0">Hubs:</span>
+                  {MEGACITIES.map((city, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setTargetLocation([city.lat, city.lon])}
+                      className="px-2 py-0.5 rounded-full bg-secondary hover:bg-secondary/80 text-secondary-foreground font-semibold shrink-0 transition-colors border border-border/40"
+                    >
+                      {city.name}
+                    </button>
+                  ))}
                 </div>
               </div>
               
-              {/* Search Bar */}
+              {/* Search Bar + GPS Locate Button */}
               <div className="relative w-full md:w-[28rem] pointer-events-auto" ref={dropdownRef}>
                 <form 
                   className="bg-card/95 backdrop-blur-xl rounded-2xl shadow-2xl p-2 border border-border/50 flex gap-2"
@@ -223,18 +283,29 @@ const AqiDashboard = () => {
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search any city or region globally..."
+                      placeholder="Search any city globally..."
                       value={search}
                       onChange={handleInputChange}
                       onFocus={() => search.length > 2 && suggestions.length > 0 && setIsDropdownOpen(true)}
-                      className="pl-10 h-11 bg-transparent border-0 outline-none focus-visible:ring-0 shadow-none text-foreground font-medium"
+                      className="pl-10 h-11 bg-transparent border-0 outline-none focus-visible:ring-0 shadow-none text-foreground font-medium text-xs"
                       autoComplete="off"
                     />
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={handleLocateMe}
+                    disabled={isLocating}
+                    className="h-11 w-11 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 rounded-xl flex items-center justify-center transition-colors border border-emerald-500/30 shrink-0"
+                    title="Locate me"
+                  >
+                    {isLocating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Navigation className="w-4 h-4" />}
+                  </button>
+
                   <button 
                     type="submit"
                     disabled={isSearching}
-                    className="h-11 w-11 bg-primary text-primary-foreground rounded-xl flex items-center justify-center hover:bg-primary/90 transition-colors shadow-md disabled:opacity-70"
+                    className="h-11 w-11 bg-primary text-primary-foreground rounded-xl flex items-center justify-center hover:bg-primary/90 transition-colors shadow-md disabled:opacity-70 shrink-0"
                   >
                     {isSearching ? <Loader2 className="w-5 h-5 animate-spin"/> : <ArrowRight className="h-5 w-5" />}
                   </button>
@@ -275,21 +346,30 @@ const AqiDashboard = () => {
           </div>
         </div>
 
-        {/* Floating Sidebar for Selected Station */}
+        {/* Floating Map Legend (Shifted to Bottom Left) */}
+        <div className="absolute bottom-6 left-6 z-[410] pointer-events-none hidden md:block">
+          <AqiLegendOverlay />
+        </div>
+
+        {/* Floating Sidebar for Selected Station (Shifted to Bottom Right) */}
         <AnimatePresence>
           {selectedStation && (
             <motion.div 
-              initial={{ opacity: 0, x: -20, scale: 0.95 }}
+              initial={{ opacity: 0, x: 20, scale: 0.95 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: -20, scale: 0.95 }}
+              exit={{ opacity: 0, x: 20, scale: 0.95 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="absolute bottom-8 left-1/2 -translate-x-1/2 md:translate-x-0 md:left-8 md:bottom-8 z-[410] w-[90%] md:w-80 bg-background/95 backdrop-blur-3xl border border-border rounded-3xl p-5 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] pointer-events-auto"
+              className="absolute bottom-6 right-6 z-[410] w-[92%] md:w-96 max-h-[75vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden bg-background/95 backdrop-blur-3xl border border-border rounded-3xl p-5 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] pointer-events-auto space-y-4"
             >
-              <div className="flex items-start justify-between mb-2">
+              <div className="flex items-start justify-between">
                 <div className="flex-1 pr-4">
                   <h2 className="text-xl font-bold text-foreground leading-tight">
                     {selectedStation.station.name}
                   </h2>
+                  <div className="flex items-center gap-2 text-muted-foreground text-xs mt-1">
+                    <MapPin className="w-3 h-3 text-emerald-500" />
+                    <span>{selectedStation.lat.toFixed(4)}, {selectedStation.lon.toFixed(4)}</span>
+                  </div>
                 </div>
                 <button 
                   onClick={() => setSelectedStation(null)}
@@ -298,13 +378,9 @@ const AqiDashboard = () => {
                   <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.8536 2.85355C13.0488 2.65829 13.0488 2.34171 12.8536 2.14645C12.6583 1.95118 12.3417 1.95118 12.1464 2.14645L7.5 6.79289L2.85355 2.14645C2.65829 1.95118 2.34171 1.95118 2.14645 2.14645C1.95118 2.34171 1.95118 2.65829 2.14645 2.85355L6.79289 7.5L2.14645 12.1464C1.95118 12.3417 1.95118 12.6583 2.14645 12.8536C2.34171 13.0488 2.65829 13.0488 2.85355 12.8536L7.5 8.20711L12.1464 12.8536C12.3417 13.0488 12.6583 13.0488 12.8536 12.8536C13.0488 12.6583 13.0488 12.3417 12.8536 12.1464L8.20711 7.5L12.8536 2.85355Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
                 </button>
               </div>
-              
-              <div className="flex items-center gap-2 text-muted-foreground text-xs mb-6">
-                <MapPin className="w-3 h-3" />
-                <span>{selectedStation.lat.toFixed(4)}, {selectedStation.lon.toFixed(4)}</span>
-              </div>
 
-              <div className="flex items-center gap-4 p-4 rounded-2xl mb-4 shadow-inner" style={{ backgroundColor: getAqiColor(selectedStation.aqi).bg, color: getAqiColor(selectedStation.aqi).text }}>
+              {/* Main AQI Badge */}
+              <div className="flex items-center gap-4 p-4 rounded-2xl shadow-inner" style={{ backgroundColor: getAqiColor(selectedStation.aqi).bg, color: getAqiColor(selectedStation.aqi).text }}>
                 <div className="text-5xl font-black tracking-tighter">{selectedStation.aqi}</div>
                 <div className="flex-1">
                   <p className="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-0.5">Air Quality</p>
@@ -312,11 +388,68 @@ const AqiDashboard = () => {
                 </div>
               </div>
 
-              <div className="space-y-3 bg-muted/30 p-4 rounded-2xl border border-border/50 text-sm">
+              {/* Sub-Pollutant Meters */}
+              {selectedStation.pollutants && (
+                <div className="space-y-2 bg-muted/30 p-3.5 rounded-2xl border border-border/50 text-xs">
+                  <div className="flex justify-between font-bold text-foreground mb-1">
+                    <span>Granular Pollutants</span>
+                    <span className="text-emerald-600 text-[10px]">Main: {selectedStation.pollutants.main}</span>
+                  </div>
+                  
+                  {[
+                    { key: "PM2.5", val: selectedStation.pollutants.pm25, max: 150 },
+                    { key: "PM10", val: selectedStation.pollutants.pm10, max: 200 },
+                    { key: "NO₂", val: selectedStation.pollutants.no2, max: 100 },
+                    { key: "O₃", val: selectedStation.pollutants.o3, max: 120 }
+                  ].map((p, idx) => (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-medium text-muted-foreground">
+                        <span>{p.key}</span>
+                        <span className="font-bold text-foreground">{p.val} µg/m³</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{ 
+                            width: `${Math.min(100, (p.val / p.max) * 100)}%`,
+                            backgroundColor: getAqiColor(p.val.toString()).bg
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Activity Health Guidance Cards */}
+              <div className="space-y-2 bg-muted/30 p-3.5 rounded-2xl border border-border/50 text-xs">
+                <span className="font-bold text-foreground block mb-1">Activity & Safety Guidance</span>
+                {(() => {
+                  const advice = getActivityGuidance(selectedStation.aqi);
+                  return (
+                    <div className="space-y-1.5 text-muted-foreground text-[11px]">
+                      <div className="flex items-center gap-2">
+                        <span>{advice.exercise}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>{advice.windows}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span>{advice.purifier}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* 24-Hour Trend & Forecast Chart */}
+              <AqiForecastChart data={selectedStation.forecast} />
+
+              <div className="space-y-2 bg-muted/30 p-3 rounded-2xl border border-border/50 text-xs">
                 <div className="flex items-center gap-3">
                    <Clock className="w-4 h-4 text-muted-foreground" />
                    <span className="text-muted-foreground">Updated:</span>
-                   <span className="font-medium text-foreground ml-auto text-xs">{selectedStation.station.time ? new Date(selectedStation.station.time).toLocaleString() : 'N/A'}</span>
+                   <span className="font-medium text-foreground ml-auto text-[11px]">{selectedStation.station.time ? new Date(selectedStation.station.time).toLocaleString() : 'N/A'}</span>
                 </div>
                 <div className="flex items-center gap-3">
                    <Info className="w-4 h-4 text-muted-foreground" />
@@ -324,10 +457,6 @@ const AqiDashboard = () => {
                    <span className="font-medium text-foreground ml-auto bg-background px-2 py-0.5 rounded shadow-sm border border-border">#{selectedStation.uid}</span>
                 </div>
               </div>
-              
-              <p className="text-[10px] text-muted-foreground/60 text-center mt-4 pt-4 border-t border-border/50">
-                Real-time data provided by WAQI
-              </p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -338,6 +467,10 @@ const AqiDashboard = () => {
           .custom-div-icon {
             background: transparent;
             border: none;
+            width: 60px !important;
+            height: 45px !important;
+            margin-left: -30px !important;
+            margin-top: -22.5px !important;
           }
           .aqi-marker-modern {
             display: flex;
@@ -349,12 +482,15 @@ const AqiDashboard = () => {
             border: 2px solid var(--aqi-color);
             background: rgba(255,255,255,0.95);
             backdrop-filter: blur(4px);
-            width: 100%;
-            height: 100%;
+            width: 28px;
+            height: 28px;
             transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            z-index: 2;
+            pointer-events: auto;
           }
-          .aqi-marker-modern:hover, .aqi-marker-modern.selected {
+          .aqi-marker-wrapper:hover .aqi-marker-modern, 
+          .aqi-marker-wrapper.selected-wrapper .aqi-marker-modern {
             transform: scale(1.3);
             z-index: 1000 !important;
             cursor: pointer;

@@ -10,6 +10,14 @@ export interface WaqiStation {
     name: string;
     time: string;
   };
+  pollutants?: {
+    pm25: number;
+    pm10: number;
+    no2: number;
+    o3: number;
+    main: string;
+  };
+  forecast?: { hour: string; aqi: number }[];
 }
 
 export interface GeocodeResult {
@@ -30,7 +38,7 @@ export const getStationsInBounds = async (
   southWest: L.LatLng,
   northEast: L.LatLng
 ): Promise<WaqiStation[]> => {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     // Generate between 15 and 35 local stations depending on zoom level feeling
     const numStations = Math.floor(Math.random() * 20) + 15;
     const stations: WaqiStation[] = [];
@@ -38,34 +46,76 @@ export const getStationsInBounds = async (
     const latSpan = northEast.lat - southWest.lat;
     const lngSpan = northEast.lng - southWest.lng;
 
-    // Simulate network delay for realism
-    setTimeout(() => {
-      for (let i = 0; i < numStations; i++) {
-        const rLat = southWest.lat + Math.random() * latSpan;
-        const rLng = southWest.lng + Math.random() * lngSpan;
-        
-        // Generate a plausible AQI bell curve (mostly 20-150, rare 200+)
-        const rand = Math.random();
-        let aqiVal = 0;
-        if (rand < 0.4) aqiVal = Math.floor(Math.random() * 50) + 10; // Good
-        else if (rand < 0.7) aqiVal = Math.floor(Math.random() * 50) + 51; // Moderate
-        else if (rand < 0.9) aqiVal = Math.floor(Math.random() * 50) + 101; // Sensitive
-        else if (rand < 0.97) aqiVal = Math.floor(Math.random() * 50) + 151; // Unhealthy
-        else aqiVal = Math.floor(Math.random() * 100) + 201; // Very Unhealthy+
+    // Generate coordinates, AQI values, sub-pollutants and forecast curves
+    for (let i = 0; i < numStations; i++) {
+      const rLat = southWest.lat + Math.random() * latSpan;
+      const rLng = southWest.lng + Math.random() * lngSpan;
+      
+      // Generate a plausible AQI bell curve (mostly 20-150, rare 200+)
+      const rand = Math.random();
+      let aqiVal = 0;
+      if (rand < 0.4) aqiVal = Math.floor(Math.random() * 50) + 10; // Good
+      else if (rand < 0.7) aqiVal = Math.floor(Math.random() * 50) + 51; // Moderate
+      else if (rand < 0.9) aqiVal = Math.floor(Math.random() * 50) + 101; // Sensitive
+      else if (rand < 0.97) aqiVal = Math.floor(Math.random() * 50) + 151; // Unhealthy
+      else aqiVal = Math.floor(Math.random() * 100) + 201; // Very Unhealthy+
 
-        stations.push({
-          uid: Math.floor(Math.random() * 1000000),
-          lat: rLat,
-          lon: rLng,
-          aqi: aqiVal.toString(),
-          station: {
-            name: `Local Monitoring Station #${Math.floor(Math.random() * 999)}`,
-            time: new Date(Date.now() - Math.random() * 10000000).toISOString(),
-          }
-        });
+      // Sub-pollutants scaled to overall AQI
+      const pm25 = Math.max(5, Math.round(aqiVal * 0.75 + (Math.random() * 10 - 5)));
+      const pm10 = Math.max(10, Math.round(aqiVal * 1.1 + (Math.random() * 15 - 7)));
+      const no2 = Math.max(8, Math.round(aqiVal * 0.35 + (Math.random() * 8 - 4)));
+      const o3 = Math.max(12, Math.round(aqiVal * 0.45 + (Math.random() * 10 - 5)));
+
+      // Generate 12h history + 12h forecast curve around current AQI
+      const forecast = [];
+      const currentHour = new Date().getHours();
+      for (let h = -12; h <= 12; h += 3) {
+        const targetHour = (currentHour + h + 24) % 24;
+        const timeLabel = h === 0 ? "Now" : `${targetHour}:00`;
+        const delta = Math.sin(h * 0.5) * 22 + (Math.random() * 10 - 5);
+        const forecastAqi = Math.max(10, Math.round(aqiVal + delta));
+        forecast.push({ hour: timeLabel, aqi: forecastAqi });
       }
-      resolve(stations);
-    }, 400); // 400ms simulated delay
+
+      stations.push({
+        uid: Math.floor(Math.random() * 1000000),
+        lat: rLat,
+        lon: rLng,
+        aqi: aqiVal.toString(),
+        station: {
+          name: `Station #${Math.floor(Math.random() * 999)}`,
+          time: new Date(Date.now() - Math.random() * 10000000).toISOString(),
+        },
+        pollutants: {
+          pm25,
+          pm10,
+          no2,
+          o3,
+          main: pm25 > no2 ? "PM2.5" : "NO₂"
+        },
+        forecast
+      });
+    }
+
+    // Now, individually reverse geocode each station to get granular local names
+    // BigDataCloud is free and fast, but let's do it in parallel batches to be safe
+    const fetchLocalName = async (station: WaqiStation) => {
+      try {
+        const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${station.lat}&longitude=${station.lon}&localityLanguage=en`);
+        const data = await res.json();
+        // Prioritize the narrowest locality first, then city/principal subdivision
+        const localName = data.locality || data.city || data.principalSubdivision || "Regional";
+        station.station.name = `${localName} Station #${Math.floor(Math.random() * 999)}`;
+      } catch (e) {
+        // Fallback if the API fails
+        station.station.name = `Local Station #${Math.floor(Math.random() * 999)}`;
+      }
+    };
+
+    // Execute fetches in parallel
+    await Promise.all(stations.map(station => fetchLocalName(station)));
+
+    resolve(stations);
   });
 };
 
