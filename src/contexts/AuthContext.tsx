@@ -1,16 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  avatar?: string;
-}
+import { registerUser, loginUser, getCurrentUser, AuthUser } from "@/services/authService";
 
 interface AuthContextType {
-  user: User | null;
-  login: (email: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+  user: AuthUser | null;
+  token: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -18,63 +13,55 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check local storage for user on mount
-    const storedUser = localStorage.getItem("eco_route_user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error("Failed to parse stored user", e);
-      }
+    // Restore session from JWT token on mount
+    const storedToken = localStorage.getItem("greenroute_token");
+    if (storedToken) {
+      setToken(storedToken);
+      getCurrentUser(storedToken)
+        .then(({ user }) => {
+          setUser(user);
+        })
+        .catch(() => {
+          // Token expired or invalid
+          localStorage.removeItem("greenroute_token");
+          setToken(null);
+          setUser(null);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
-  const login = async (email: string) => {
-    // Mock login simulating network delay
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        const mockUser = {
-          id: Math.random().toString(36).substring(2, 9),
-          email,
-          name: email.split('@')[0],
-          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${email.split('@')[0]}`,
-        };
-        setUser(mockUser);
-        localStorage.setItem("eco_route_user", JSON.stringify(mockUser));
-        resolve();
-      }, 1000);
-    });
+  const login = async (email: string, password: string) => {
+    const res = await loginUser(email, password);
+    setUser(res.user);
+    setToken(res.token);
+    localStorage.setItem("greenroute_token", res.token);
   };
 
-  const loginWithGoogle = async () => {
-    // Mock google login
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        const mockUser = {
-          id: Math.random().toString(36).substring(2, 9),
-          email: "user@google.com",
-          name: "Google User",
-          avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Google",
-        };
-        setUser(mockUser);
-        localStorage.setItem("eco_route_user", JSON.stringify(mockUser));
-        resolve();
-      }, 1000);
-    });
+  const register = async (name: string, email: string, password: string) => {
+    const res = await registerUser(name, email, password);
+    setUser(res.user);
+    setToken(res.token);
+    localStorage.setItem("greenroute_token", res.token);
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("eco_route_user");
+    setToken(null);
+    localStorage.removeItem("greenroute_token");
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, loginWithGoogle, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
