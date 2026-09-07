@@ -37,6 +37,37 @@ export const searchQueryLocations = async (query: string): Promise<LocationSugge
   }
 };
 
+export const reverseGeocodeLocation = async (lat: number, lon: number): Promise<LocationSuggestion> => {
+  try {
+    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+    if (response.ok) {
+      const data = await response.json();
+      const displayName = data.display_name || "Custom GPS Target";
+      const parts = displayName.split(',');
+      return {
+        id: `gps-${lat.toFixed(4)}-${lon.toFixed(4)}`,
+        name: parts[0] || "My Location",
+        parent: parts.slice(1, 3).join(',').trim() || `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
+        type: "locality",
+        lat,
+        lon,
+        popularity: 100
+      };
+    }
+  } catch (err) {
+    console.warn("Reverse geocode failed:", err);
+  }
+  return {
+    id: `gps-${lat.toFixed(4)}-${lon.toFixed(4)}`,
+    name: "GPS Location Target",
+    parent: `${lat.toFixed(4)}, ${lon.toFixed(4)}`,
+    type: "locality",
+    lat,
+    lon,
+    popularity: 100
+  };
+};
+
 const formatDistance = (meters: number): string => {
   if (meters < 1000) return `${Math.round(meters)} m`;
   return `${(meters / 1000).toFixed(1)} km`;

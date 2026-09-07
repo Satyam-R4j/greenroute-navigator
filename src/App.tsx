@@ -24,14 +24,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/aqi" element={<AqiDashboard />} />
-            <Route 
-              path="/route-map" 
-              element={
-                <ProtectedRoute>
-                  <RouteMap />
-                </ProtectedRoute>
-              } 
-            />
+            <Route path="/route-map" element={<RouteMap />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
